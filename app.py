@@ -1,17 +1,26 @@
+import os
 from flask import Flask, request, jsonify, render_template, session
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import AIMessage, HumanMessage, SystemMessage
-import os
 
-# API 키 설정
-os.environ["OPENAI_API_KEY"] = "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"  # 실제 키 사용
+# 환경변수에서 API 키 가져오기
+openai_api_key = os.getenv("OPENAI_API_KEY")
+
+if not openai_api_key:
+    raise ValueError("OPENAI_API_KEY 환경변수가 설정되어 있지 않습니다.")
+
+# LangChain LLM 설정
+chatgpt = ChatOpenAI(
+    model_name='gpt-4o-mini',
+    streaming=False,
+    temperature=0,
+    openai_api_key=openai_api_key
+)
 
 app = Flask(__name__)
-app.secret_key = "your-secret-key"  # 세션 저장을 위한 키
+app.secret_key = "your-secret-key"  # 세션 사용을 위한 비밀 키
 
-chatgpt = ChatOpenAI(model_name='gpt-4o-mini', streaming=False, temperature=0)
-
-# 시스템 프롬프트
+# 시스템 프롬프트 설정
 system_prompt = SystemMessage(content="""너는 법률 전문 변호사야.
 사용자의 질문을 기반으로 최대한 간단하게 아래 템플릿을 바탕으로 적어줘
 
@@ -58,18 +67,18 @@ system_prompt = SystemMessage(content="""너는 법률 전문 변호사야.
 
 @app.route("/")
 def home():
-    return render_template("index.html")
+    return render_template("index.html")  # index.html이 templates 폴더 안에 있어야 함
 
 @app.route("/ask", methods=["POST"])
 def ask():
     data = request.get_json()
     question = data.get("question", "")
 
-    # 세션에 히스토리가 없으면 초기화
+    # 세션 히스토리 초기화
     if "chat_history" not in session:
         session["chat_history"] = []
 
-    # 메시지 구성
+    # 히스토리를 LangChain 메시지 형식으로 구성
     messages = [system_prompt]
     for msg in session["chat_history"]:
         if msg["role"] == "user":
